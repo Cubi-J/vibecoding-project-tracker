@@ -113,6 +113,75 @@ export const AI_TOOLS = [
 ];
 
 /* ———————————————————————————————————————————————————————
+ * Due Date State / Colour Tinting (M8 due-tint)
+ * ——————————————————————————————————————————————————————— */
+
+/**
+ * Pure function: calculates due date state and border/badge color styling
+ * based on PRD §1.3 and DESIGN.md §2.
+ *
+ * Rules:
+ *  - Neutral: Task status is 'done' regardless of due date (#475569).
+ *  - None: No deadline provided (uses default surface border).
+ *  - Alarm (Overdue): Past due date (#EF4444).
+ *  - Warning: Less than 24 hours remaining (#F59E0B).
+ *  - Calm (Safe): More than 2 days out (#3B82F6).
+ *
+ * @param {string|null} dueDate - ISO 'YYYY-MM-DD'
+ * @param {string} status - 'todo' | 'in-progress' | 'review' | 'done'
+ * @param {Date} [now=new Date()]
+ * @returns {{ state: 'neutral'|'none'|'overdue'|'warning'|'safe', borderClass: string, badgeClass: string, label: string }}
+ */
+export function getDueStatus(dueDate, status, now = new Date()) {
+  if (status === 'done') {
+    return {
+      state: 'neutral',
+      borderClass: 'border-due-neutral/70 hover:border-due-neutral',
+      badgeClass: 'text-due-neutral bg-due-neutral/10 border-due-neutral/30',
+      label: 'Done',
+    };
+  }
+
+  if (!dueDate) {
+    return {
+      state: 'none',
+      borderClass: 'border-surface-border hover:border-slate-500/60',
+      badgeClass: 'text-text-muted bg-surface-page/80 border-surface-border/80',
+      label: '',
+    };
+  }
+
+  const [year, month, day] = dueDate.split('-').map(Number);
+  const dueDateTime = new Date(year, month - 1, day, 23, 59, 59, 999);
+  const diffMs = dueDateTime.getTime() - now.getTime();
+
+  if (diffMs < 0) {
+    return {
+      state: 'overdue',
+      borderClass: 'border-due-overdue/80 hover:border-due-overdue shadow-sm shadow-due-overdue/10',
+      badgeClass: 'text-due-overdue bg-due-overdue/10 border-due-overdue/30',
+      label: 'Overdue',
+    };
+  }
+
+  if (diffMs <= 24 * 60 * 60 * 1000) {
+    return {
+      state: 'warning',
+      borderClass: 'border-due-warning/80 hover:border-due-warning shadow-sm shadow-due-warning/10',
+      badgeClass: 'text-due-warning bg-due-warning/10 border-due-warning/30',
+      label: 'Due soon',
+    };
+  }
+
+  return {
+    state: 'safe',
+    borderClass: 'border-due-safe/70 hover:border-due-safe',
+    badgeClass: 'text-due-safe bg-due-safe/10 border-due-safe/30',
+    label: 'On track',
+  };
+}
+
+/* ———————————————————————————————————————————————————————
  * Seed data — pre-populated on first launch
  * ——————————————————————————————————————————————————————— */
 
@@ -146,6 +215,11 @@ export function createTask(id, title, description, type, status, assignee, dueDa
   };
 }
 
+const nowMs = Date.now();
+const todayIso = new Date(nowMs).toISOString().slice(0, 10);
+const futureIso = new Date(nowMs + 4 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const pastIso = new Date(nowMs - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 /**
  * Pre-populated mock tasks so the board is not empty on first launch (PRD §1.1).
  */
@@ -157,7 +231,7 @@ export const seedTasks = [
     'feature',
     'done',
     'Teammate A',
-    null,
+    todayIso,
   ),
   createTask(
     't-002',
@@ -166,7 +240,7 @@ export const seedTasks = [
     'bug',
     'in-progress',
     'Teammate B',
-    new Date().toISOString().slice(0, 10),
+    todayIso,
   ),
   createTask(
     't-003',
@@ -175,7 +249,7 @@ export const seedTasks = [
     'feature',
     'todo',
     'Teammate C',
-    new Date().toISOString().slice(0, 10),
+    futureIso,
   ),
   createTask(
     't-004',
@@ -184,7 +258,7 @@ export const seedTasks = [
     'vulnerability',
     'review',
     'Teammate C',
-    null,
+    pastIso,
   ),
   createTask(
     't-005',

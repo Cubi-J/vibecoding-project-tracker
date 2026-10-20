@@ -8,6 +8,7 @@ import {
   STORAGE_KEYS,
   seedTasks,
   seedAnchors,
+  getDueStatus,
 } from './model';
 
 export { STAGES, STATUS, TEAM };
@@ -128,6 +129,7 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }
   if (!isOpen || !task) return null;
 
   const typeConfig = getTypeConfig(task.type);
+  const dueStatus = getDueStatus(task.dueDate, task.status);
   const stage = STAGES.find((s) => s.id === task.status);
 
   const stageAccents = {
@@ -190,33 +192,33 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }
           </div>
 
           {/* Metadata Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-lg bg-surface-page border border-surface-border/70 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-3.5 rounded-lg bg-surface-page border border-surface-border/70 text-xs">
             {/* Status */}
-            <div>
+            <div className="min-w-0">
               <span className="block font-mono text-[10px] text-text-muted uppercase tracking-wider mb-1">
                 Status
               </span>
               <div className="flex items-center gap-1.5 font-medium text-text-primary">
-                <span className={`h-2 w-2 rounded-full ${accentDot}`} />
-                <span>{stage?.label || task.status}</span>
+                <span className={`h-2 w-2 rounded-full ${accentDot} shrink-0`} />
+                <span className="truncate">{stage?.label || task.status}</span>
               </div>
             </div>
 
             {/* Assignee with Hand off selector */}
-            <div>
+            <div className="min-w-0">
               <span className="block font-mono text-[10px] text-text-muted uppercase tracking-wider mb-1">
                 Assignee
               </span>
-              <div className="relative inline-flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0 w-full">
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
                   {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
                 </div>
-                <div className="relative">
+                <div className="relative min-w-0 flex-1">
                   <select
                     value={task.assignee || ''}
                     onChange={(e) => onHandoff(task.id, e.target.value, task.assignee)}
                     aria-label="Hand off to..."
-                    className="appearance-none bg-surface-card hover:bg-surface-border/50 border border-surface-border rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
+                    className="w-full truncate appearance-none bg-surface-card hover:bg-surface-border/50 border border-surface-border rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
                   >
                     <option value="" disabled={Boolean(task.assignee)}>
                       {task.assignee ? task.assignee : 'Hand off to...'}
@@ -238,13 +240,29 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }
             </div>
 
             {/* Due Date */}
-            <div>
+            <div className="min-w-0">
               <span className="block font-mono text-[10px] text-text-muted uppercase tracking-wider mb-1">
                 Due Date
               </span>
-              <span className="font-mono text-text-primary">
-                {task.dueDate || 'No deadline'}
-              </span>
+              {task.dueDate ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span
+                    className={`inline-flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded border shrink-0 ${dueStatus.badgeClass}`}
+                  >
+                    <svg className="h-3 w-3 opacity-80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Due {task.dueDate}
+                  </span>
+                  {dueStatus.label && (
+                    <span className="text-[11px] font-mono text-text-muted whitespace-nowrap">
+                      ({dueStatus.label})
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="font-mono text-xs text-text-muted">No deadline</span>
+              )}
             </div>
           </div>
 
@@ -639,20 +657,43 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
  */
 function TaskCard({ task, onTaskClick, onHandoff }) {
   const typeConfig = getTypeConfig(task.type);
+  const dueStatus = getDueStatus(task.dueDate, task.status);
 
   return (
     <article
       onClick={() => onTaskClick(task)}
-      className="group relative rounded-lg border border-surface-border bg-surface-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-500/60 shadow-sm cursor-pointer"
+      className={`group relative rounded-lg border bg-surface-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 shadow-sm cursor-pointer ${dueStatus.borderClass}`}
     >
-      {/* Top row: Type badge */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+      {/* Top row: Type badge & Due Date (Milestone 8 due-tint) */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 mb-2.5">
         <span
           className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
           {typeConfig.label}
         </span>
+
+        {task.dueDate && (
+          <div
+            className={`inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded border shrink-0 ${dueStatus.badgeClass}`}
+            title={`Due date: ${task.dueDate}${dueStatus.label ? ` (${dueStatus.label})` : ''}`}
+          >
+            <svg
+              className="h-3 w-3 opacity-80"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <span>Due {task.dueDate}</span>
+          </div>
+        )}
       </div>
 
       {/* Task Name */}
@@ -660,24 +701,24 @@ function TaskCard({ task, onTaskClick, onHandoff }) {
         {task.title}
       </h3>
 
-      {/* Card Footer: Assignee & Due Date */}
-      <div className="mt-3 flex items-center justify-between border-t border-surface-border/60 pt-2.5 gap-2">
+      {/* Card Footer: Assignee */}
+      <div className="mt-3 flex items-center justify-between border-t border-surface-border/60 pt-2.5">
         {/* Assignee badge + "Hand off to..." dropdown (Milestone 7 task-owner) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center gap-1.5 min-w-0"
+          className="flex items-center gap-1.5 w-full"
           title={task.assignee ? `Assigned to ${task.assignee} — click to hand off` : 'Unassigned — click to hand off'}
         >
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
             {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
           </div>
 
-          <div className="relative inline-flex items-center">
+          <div className="relative inline-flex items-center flex-1 min-w-0">
             <select
               value={task.assignee || ''}
               onChange={(e) => onHandoff(task.id, e.target.value, task.assignee)}
               aria-label="Hand off to..."
-              className="appearance-none bg-surface-page/80 hover:bg-surface-page border border-surface-border/80 hover:border-brand-primary/60 rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-muted hover:text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
+              className="w-full truncate appearance-none bg-surface-page/80 hover:bg-surface-page border border-surface-border/80 hover:border-brand-primary/60 rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-muted hover:text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
             >
               <option value="" disabled={Boolean(task.assignee)}>
                 {task.assignee ? task.assignee : 'Hand off to...'}
@@ -696,29 +737,6 @@ function TaskCard({ task, onTaskClick, onHandoff }) {
             </div>
           </div>
         </div>
-
-        {/* Due Date */}
-        {task.dueDate && (
-          <div
-            className="flex items-center gap-1 text-[11px] font-mono text-text-muted shrink-0"
-            title={`Due date: ${task.dueDate}`}
-          >
-            <svg
-              className="h-3.5 w-3.5 opacity-70"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <span>{task.dueDate}</span>
-          </div>
-        )}
       </div>
     </article>
   );
