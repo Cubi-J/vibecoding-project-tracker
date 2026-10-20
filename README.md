@@ -50,7 +50,7 @@ Replace `<tag-name>` with the tag for the milestone you just finished — see th
 
 | # | Tag | What it means |
 |---|---|---|
-| Done | `git-linked` | Repo registered on the portal, webhook delivers test ping |
+| 1 | `git-linked` | Repo registered on the portal, webhook delivers test ping |
 | 2 | `prd-done` | PRD reviewed, team-specific TODOs filled in |
 | 3 | `design-done` | DESIGN.md filled in, color tokens pasted into `tailwind.config.js` (parallel to M2) |
 | 4 | `data-model` | Four-column board renders with 3-4 mock tasks |
