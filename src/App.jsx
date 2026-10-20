@@ -73,11 +73,47 @@ export function useLocalStorage(key, initialValue) {
 }
 
 /**
+ * Toast Component
+ * Displays toast notifications (e.g. handoff alerts) with 200ms smooth fade.
+ * Microcopy per DESIGN.md §5: "{Name} has received the task! Their problem now..."
+ */
+function Toast({ toast, onClose }) {
+  if (!toast) return null;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border border-brand-primary/40 bg-surface-card px-4 py-3 text-sm text-text-primary shadow-2xl shadow-black/80 transition-all duration-200"
+    >
+      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-primary/20 text-brand-primary shrink-0">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </div>
+      <p className="font-medium text-xs sm:text-sm text-text-primary pr-1">
+        {toast.message}
+      </p>
+      <button
+        type="button"
+        onClick={onClose}
+        className="ml-auto rounded-md p-1 text-text-muted hover:bg-surface-border hover:text-text-primary transition-colors shrink-0"
+        aria-label="Close notification"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/**
  * TaskDetailsModal Component
  * Dedicated read-only view for cleanly reading task details and AI prompt context.
- * Prevents accidental edits, with an "Edit Task" button to transition to edit mode.
+ * Prevents accidental edits, with an "Edit Task" button and quick handoff selector.
  */
-function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, task }) {
+function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }) {
   // Close modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -166,16 +202,38 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, task }) {
               </div>
             </div>
 
-            {/* Assignee */}
+            {/* Assignee with Hand off selector */}
             <div>
               <span className="block font-mono text-[10px] text-text-muted uppercase tracking-wider mb-1">
                 Assignee
               </span>
-              <div className="flex items-center gap-1.5 font-medium text-text-primary">
-                <div className="flex h-4 w-4 items-center justify-center rounded-full bg-surface-border text-[9px] font-mono">
+              <div className="relative inline-flex items-center gap-1.5">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
                   {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
                 </div>
-                <span>{task.assignee || 'Unassigned'}</span>
+                <div className="relative">
+                  <select
+                    value={task.assignee || ''}
+                    onChange={(e) => onHandoff(task.id, e.target.value, task.assignee)}
+                    aria-label="Hand off to..."
+                    className="appearance-none bg-surface-card hover:bg-surface-border/50 border border-surface-border rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
+                  >
+                    <option value="" disabled={Boolean(task.assignee)}>
+                      {task.assignee ? task.assignee : 'Hand off to...'}
+                    </option>
+                    {task.assignee && <option value="">Unassign</option>}
+                    {TEAM.map((member) => (
+                      <option key={member} value={member}>
+                        {member === task.assignee ? `${member} (current)` : `Hand off to ${member}`}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-text-muted opacity-70">
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -576,58 +634,73 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
 
 /**
  * TaskCard Component
- * Displays a single task card. Clicking opens the view details modal.
+ * Displays a single task card with assignee badge and inline "Hand off to..." dropdown.
+ * Clicking the card opens the view details modal; clicking the handoff dropdown does not.
  */
-function TaskCard({ task, onTaskClick }) {
+function TaskCard({ task, onTaskClick, onHandoff }) {
   const typeConfig = getTypeConfig(task.type);
 
   return (
     <article
       onClick={() => onTaskClick(task)}
-      className="group relative rounded-lg border border-surface-border bg-surface-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-500/60 shadow-sm cursor-pointer"
+      className="group relative rounded-lg border border-surface-border bg-surface-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-500/60 shadow-sm cursor-pointer"
     >
-      {/* Top row: Type badge & Task ID */}
-      <div className="flex items-center justify-between gap-2 mb-2.5">
+      {/* Top row: Type badge */}
+      <div className="flex items-center justify-between gap-2 mb-2">
         <span
           className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
           {typeConfig.label}
         </span>
-        <span className="text-[11px] font-mono text-text-muted">#{task.id}</span>
       </div>
 
       {/* Task Name */}
-      <h3 className="font-medium text-sm text-text-primary leading-snug group-hover:text-white transition-colors">
+      <h3 className="font-medium text-sm text-text-primary leading-snug group-hover:text-white transition-colors line-clamp-2">
         {task.title}
       </h3>
 
-      {/* Task Description */}
-      {task.description && (
-        <p className="mt-1.5 text-xs text-text-muted line-clamp-2 leading-relaxed">
-          {task.description}
-        </p>
-      )}
-
       {/* Card Footer: Assignee & Due Date */}
-      <div className="mt-4 flex items-center justify-between border-t border-surface-border/60 pt-3">
-        {/* Assignee */}
+      <div className="mt-3 flex items-center justify-between border-t border-surface-border/60 pt-2.5 gap-2">
+        {/* Assignee badge + "Hand off to..." dropdown (Milestone 7 task-owner) */}
         <div
-          className="flex items-center gap-2"
-          title={`Assignee: ${task.assignee || 'Unassigned'}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 min-w-0"
+          title={task.assignee ? `Assigned to ${task.assignee} — click to hand off` : 'Unassigned — click to hand off'}
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-border text-[11px] font-mono font-medium text-text-primary ring-1 ring-white/10">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
             {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
           </div>
-          <span className="text-xs text-text-muted font-medium">
-            {task.assignee || 'Unassigned'}
-          </span>
+
+          <div className="relative inline-flex items-center">
+            <select
+              value={task.assignee || ''}
+              onChange={(e) => onHandoff(task.id, e.target.value, task.assignee)}
+              aria-label="Hand off to..."
+              className="appearance-none bg-surface-page/80 hover:bg-surface-page border border-surface-border/80 hover:border-brand-primary/60 rounded px-2 py-0.5 pr-5 text-xs font-medium text-text-muted hover:text-text-primary cursor-pointer transition-colors focus:outline-none focus:border-brand-primary"
+            >
+              <option value="" disabled={Boolean(task.assignee)}>
+                {task.assignee ? task.assignee : 'Hand off to...'}
+              </option>
+              {task.assignee && <option value="">Unassign</option>}
+              {TEAM.map((member) => (
+                <option key={member} value={member}>
+                  {member === task.assignee ? `${member} (current)` : `Hand off to ${member}`}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-text-muted opacity-70">
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Due Date */}
         {task.dueDate && (
           <div
-            className="flex items-center gap-1 text-[11px] font-mono text-text-muted"
+            className="flex items-center gap-1 text-[11px] font-mono text-text-muted shrink-0"
             title={`Due date: ${task.dueDate}`}
           >
             <svg
@@ -655,7 +728,7 @@ function TaskCard({ task, onTaskClick }) {
  * KanbanColumn Component
  * Renders one of the four columns with column header and list of cards.
  */
-function KanbanColumn({ stage, tasks, onTaskClick }) {
+function KanbanColumn({ stage, tasks, onTaskClick, onHandoff }) {
   const stageAccents = {
     'todo': 'bg-brand-accent',
     'in-progress': 'bg-due-warning',
@@ -684,7 +757,12 @@ function KanbanColumn({ stage, tasks, onTaskClick }) {
       <div className="flex flex-col gap-3 flex-1">
         {tasks.length > 0 ? (
           tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onTaskClick={onTaskClick} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onTaskClick={onTaskClick}
+              onHandoff={onHandoff}
+            />
           ))
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-surface-border p-6 text-center">
@@ -706,6 +784,22 @@ export default function App() {
   // Form modal state (Add / Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+
+  // Toast notification state (Milestone 7 handoff toast, etc.)
+  const [toast, setToast] = useState(null);
+
+  const triggerToast = (message) => {
+    setToast({ id: Date.now(), message });
+  };
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // TODO M11 anchors:
   //   const [anchors, setAnchors] = useLocalStorage(STORAGE_KEYS.anchors, seedAnchors);
@@ -735,8 +829,44 @@ export default function App() {
     setViewingTask(null);
   };
 
+  /**
+   * Handle task hand-off to a new assignee.
+   * Updates task in state/localStorage and triggers hand-off alert per DESIGN.md §5.
+   */
+  const handleHandoff = (taskId, newAssignee, previousAssignee) => {
+    if (newAssignee === (previousAssignee || '')) return;
+
+    const resolvedAssignee = newAssignee || null;
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignee: resolvedAssignee } : t))
+    );
+
+    // Keep viewingTask in sync if the view modal is currently open
+    setViewingTask((prev) =>
+      prev && prev.id === taskId ? { ...prev, assignee: resolvedAssignee } : prev
+    );
+
+    // Handoff toast microcopy from DESIGN.md §5
+    if (resolvedAssignee) {
+      triggerToast(`${resolvedAssignee} has received the task! Their problem now...`);
+    } else {
+      triggerToast('Task unassigned.');
+    }
+  };
+
   const handleSaveTask = (taskData) => {
     if (editingTask) {
+      const prevAssignee = editingTask.assignee;
+      const nextAssignee = taskData.assignee;
+
+      // Check if assignee was changed during edit
+      if (nextAssignee && nextAssignee !== prevAssignee) {
+        triggerToast(`${nextAssignee} has received the task! Their problem now...`);
+      } else if (!nextAssignee && prevAssignee) {
+        triggerToast('Task unassigned.');
+      }
+
       // Edit existing task
       setTasks((prev) =>
         prev.map((t) => {
@@ -758,6 +888,9 @@ export default function App() {
         contextUpdatedAt: taskData.context ? new Date().toISOString() : null,
       };
       setTasks((prev) => [...prev, newTask]);
+      if (taskData.assignee) {
+        triggerToast(`${taskData.assignee} has received the task! Their problem now...`);
+      }
     }
     handleCloseFormModal();
   };
@@ -812,6 +945,7 @@ export default function App() {
               stage={stage}
               tasks={columnTasks}
               onTaskClick={handleOpenViewModal}
+              onHandoff={handleHandoff}
             />
           );
         })}
@@ -823,6 +957,7 @@ export default function App() {
         onClose={handleCloseViewModal}
         onEdit={handleStartEditFromView}
         onDelete={handleDeleteTask}
+        onHandoff={handleHandoff}
         task={viewingTask}
       />
 
@@ -834,6 +969,9 @@ export default function App() {
         onDelete={handleDeleteTask}
         task={editingTask}
       />
+
+      {/* Toast Notification (Handoff alert, etc.) */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
