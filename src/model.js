@@ -42,8 +42,8 @@ export const STORAGE_KEYS = {
  * @property {string} id                  Unique identifier (uuid v4)
  * @property {string} title               Short task header
  * @property {string} description         Detailed description
- * @property {'feature'|'bug'} type       Driving visual styling (M6 tag-style)
- * @property {'todo'|'in-progress'|'review'|'done'} status  Column location
+ * @property {'feature'|'bug'|'vulnerability'} type Driving visual styling (M6 tag-style)
+ * @property {'todo'|'in-progress'|'review'|'done'} status Column location
  * @property {string|null} assignee       Team member working on it (M7 task-owner)
  * @property {string|null} dueDate        ISO 'YYYY-MM-DD' — null means no deadline
  * @property {string} createdDate         ISO 'YYYY-MM-DD' — set at creation
@@ -84,8 +84,9 @@ export const STATUS = {
  * ——————————————————————————————————————————————————————— */
 
 export const TASK_TYPES = [
-  { value: 'feature', label: 'Feature' },
-  { value: 'bug',     label: 'Bug' },
+  { value: 'feature',       label: 'Feature' },
+  { value: 'bug',           label: 'Bug' },
+  { value: 'vulnerability', label: 'Vulnerability' },
 ];
 
 /* ———————————————————————————————————————————————————————
@@ -121,7 +122,7 @@ export const AI_TOOLS = [
  * @param {string} id
  * @param {string} title
  * @param {string} description
- * @param {'feature'|'bug'} type
+ * @param {'feature'|'bug'|'vulnerability'} type
  * @param {'todo'|'in-progress'|'review'|'done'} status
  * @param {string|null} assignee
  * @param {string|null} dueDate
@@ -178,9 +179,9 @@ export const seedTasks = [
   ),
   createTask(
     't-004',
-    'Wire up localStorage persistence',
-    'Ensure tasks survive a page refresh with zero data loss.',
-    'feature',
+    'Audit localStorage against XSS injection',
+    'Ensure stored task contexts are properly sanitized to prevent potential script execution vulnerabilities.',
+    'vulnerability',
     'review',
     'Teammate C',
     null,

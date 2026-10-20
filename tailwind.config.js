@@ -21,22 +21,23 @@ export default {
 
         // Typography Tokens
         text: {
-          primary: '#F8FAFC',   // Body text[cite: 1]
-          muted: '#94A3B8',     // Captions, dates, counts[cite: 1]
+          primary: '#F8FAFC',   // Body text
+          muted: '#94A3B8',     // Captions, dates, counts
         },
 
         // Task Type Accent Colors (Milestone 6: tag-style)
         type: {
-          feature: '#10B981',   // Feature cards (accent stripe + icon)[cite: 1]
-          bug: '#EC4899',       // Bug cards (accent stripe + icon)[cite: 1]
+          feature: '#10B981',        // Feature cards (accent stripe + icon)
+          bug: '#EC4899',            // Bug cards (accent stripe + icon)
+          vulnerability: '#9333EA',  // Vulnerability cards (deep urgent purple)
         },
 
         // Due-Date Time States (Milestone 8: due-tint)
         due: {
-          safe: '#3B82F6',      // More than 2 days out[cite: 1]
-          warning: '#F59E0B',   // Less than 24 hours[cite: 1]
-          overdue: '#EF4444',   // Past due[cite: 1]
-          neutral: '#475569',   // Done (overrides date)[cite: 1]
+          safe: '#3B82F6',      // More than 2 days out
+          warning: '#F59E0B',   // Less than 24 hours
+          overdue: '#EF4444',   // Past due
+          neutral: '#475569',   // Done (overrides date)
         },
       },
       fontFamily: {

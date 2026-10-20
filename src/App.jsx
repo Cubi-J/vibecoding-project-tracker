@@ -13,6 +13,34 @@ import {
 export { STAGES, STATUS, TEAM };
 
 /**
+ * Visual styling and metadata for each supported task type.
+ * 'feature' -> Emerald Green (#10B981)
+ * 'bug'     -> Hot Pink (#EC4899)
+ * 'vulnerability' -> Deep Urgent Purple (#9333EA)
+ */
+const TYPE_CONFIG = {
+  feature: {
+    label: 'Feature',
+    badgeClass: 'bg-[#10B981]/10 text-type-feature border border-type-feature/30',
+    dotClass: 'bg-type-feature',
+  },
+  bug: {
+    label: 'Bug',
+    badgeClass: 'bg-[#EC4899]/10 text-type-bug border border-type-bug/30',
+    dotClass: 'bg-type-bug',
+  },
+  vulnerability: {
+    label: 'Vulnerability',
+    badgeClass: 'bg-[#9333EA]/25 text-[#D8B4FE] border border-[#9333EA]/60',
+    dotClass: 'bg-[#9333EA] shadow-[0_0_8px_rgba(147,51,234,0.9)] ring-1 ring-[#D8B4FE]/40',
+  },
+};
+
+function getTypeConfig(type) {
+  return TYPE_CONFIG[type] || TYPE_CONFIG.feature;
+}
+
+/**
  * A tiny localStorage hook — survives reloads, no library needed.
  * Pre-populates with initialValue when stored data is absent or empty.
  */
@@ -63,7 +91,7 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, task }) {
 
   if (!isOpen || !task) return null;
 
-  const isBug = task.type === 'bug';
+  const typeConfig = getTypeConfig(task.type);
   const stage = STAGES.find((s) => s.id === task.status);
 
   const stageAccents = {
@@ -94,18 +122,10 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, task }) {
         <div className="flex items-center justify-between p-5 border-b border-surface-border">
           <div className="flex items-center gap-2.5">
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-mono uppercase tracking-wider font-semibold ${
-                isBug
-                  ? 'bg-[#EC4899]/10 text-type-bug border border-type-bug/30'
-                  : 'bg-[#10B981]/10 text-type-feature border border-type-feature/30'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
             >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  isBug ? 'bg-type-bug' : 'bg-type-feature'
-                }`}
-              />
-              {task.type}
+              <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
+              {typeConfig.label}
             </span>
             <span className="text-xs font-mono text-text-muted bg-surface-page border border-surface-border px-2 py-0.5 rounded">
               #{task.id}
@@ -559,7 +579,7 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
  * Displays a single task card. Clicking opens the view details modal.
  */
 function TaskCard({ task, onTaskClick }) {
-  const isBug = task.type === 'bug';
+  const typeConfig = getTypeConfig(task.type);
 
   return (
     <article
@@ -569,18 +589,10 @@ function TaskCard({ task, onTaskClick }) {
       {/* Top row: Type badge & Task ID */}
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <span
-          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${
-            isBug
-              ? 'bg-[#EC4899]/10 text-type-bug border border-type-bug/30'
-              : 'bg-[#10B981]/10 text-type-feature border border-type-feature/30'
-          }`}
+          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
         >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              isBug ? 'bg-type-bug' : 'bg-type-feature'
-            }`}
-          />
-          {task.type}
+          <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
+          {typeConfig.label}
         </span>
         <span className="text-[11px] font-mono text-text-muted">#{task.id}</span>
       </div>

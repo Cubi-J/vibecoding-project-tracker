@@ -47,6 +47,7 @@ These are the colors the build milestones will reference. Once chosen, paste the
 |---|---|---|
 | `type-feature` | #10B981 | Cards tagged `feature` (accent stripe + icon) |
 | `type-bug` | #EC4899 | Cards tagged `bug` (accent stripe + icon) |
+| `type-vulnerability` | #9333EA | Cards tagged `vulnerability` (deep urgent purple accent stripe + icon) |
 
 ### Due-date states (M8 `due-tint`)
 
