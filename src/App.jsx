@@ -42,6 +42,33 @@ function getTypeConfig(type) {
 }
 
 /**
+ * Serialises a Task into a structured Markdown prompt block (Milestone 10 copy-prompt).
+ * Copies Title, Description, AI Tool, and Context — ready to paste into Claude / ChatGPT etc.
+ *
+ * @param {Task} task
+ * @returns {string} Markdown string
+ */
+function buildPromptMarkdown(task) {
+  const lines = [];
+  lines.push(`# Task: ${task.title}`);
+  if (task.description) {
+    lines.push('');
+    lines.push('## Description');
+    lines.push(task.description);
+  }
+  if (task.contextTool) {
+    lines.push('');
+    lines.push(`**AI Tool:** ${task.contextTool}`);
+  }
+  if (task.context) {
+    lines.push('');
+    lines.push('## Prompt Context');
+    lines.push(task.context);
+  }
+  return lines.join('\n');
+}
+
+/**
  * A tiny localStorage hook — survives reloads, no library needed.
  * Pre-populates with initialValue when stored data is absent or empty.
  */
@@ -114,7 +141,7 @@ function Toast({ toast, onClose }) {
  * Dedicated read-only view for cleanly reading task details and AI prompt context.
  * Prevents accidental edits, with an "Edit Task" button and quick handoff selector.
  */
-function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }) {
+function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, onCopyPrompt, task }) {
   // Close modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -280,17 +307,32 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }
             )}
           </div>
 
-          {/* AI Context Section */}
+            {/* AI Context Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-mono font-medium text-text-muted uppercase tracking-wider">
                 Prompt Context
               </h3>
-              {task.contextTool && (
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-brand-primary/15 border border-brand-primary/30 text-brand-accent">
-                  Tool: {task.contextTool}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {task.contextTool && (
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-brand-primary/15 border border-brand-primary/30 text-brand-accent">
+                    Tool: {task.contextTool}
+                  </span>
+                )}
+                {(task.context || task.description) && (
+                  <button
+                    type="button"
+                    onClick={() => onCopyPrompt(task)}
+                    title="Copy as Prompt Context"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium text-brand-accent bg-brand-primary/10 border border-brand-primary/25 hover:bg-brand-primary/20 hover:border-brand-primary/50 active:scale-95 transition-all"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy Prompt
+                  </button>
+                )}
+              </div>
             </div>
 
             {task.context ? (
@@ -332,6 +374,18 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, task }
             >
               Close
             </button>
+            {(task.context || task.description) && (
+              <button
+                type="button"
+                onClick={() => onCopyPrompt(task)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-brand-accent bg-brand-primary/10 border border-brand-primary/25 hover:bg-brand-primary/20 active:scale-95 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy Prompt
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onEdit(task)}
@@ -655,7 +709,7 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
  * Displays a single task card with assignee badge and inline "Hand off to..." dropdown.
  * Clicking the card opens the view details modal; clicking the handoff dropdown does not.
  */
-function TaskCard({ task, onTaskClick, onHandoff }) {
+function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
   const typeConfig = getTypeConfig(task.type);
   const dueStatus = getDueStatus(task.dueDate, task.status);
 
@@ -701,12 +755,12 @@ function TaskCard({ task, onTaskClick, onHandoff }) {
         {task.title}
       </h3>
 
-      {/* Card Footer: Assignee */}
-      <div className="mt-3 flex items-center justify-between border-t border-surface-border/60 pt-2.5">
+      {/* Card Footer: Assignee + Copy Prompt icon */}
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-surface-border/60 pt-2.5">
         {/* Assignee badge + "Hand off to..." dropdown (Milestone 7 task-owner) */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex items-center gap-1.5 w-full"
+          className="flex items-center gap-1.5 min-w-0 flex-1"
           title={task.assignee ? `Assigned to ${task.assignee} — click to hand off` : 'Unassigned — click to hand off'}
         >
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
@@ -737,6 +791,21 @@ function TaskCard({ task, onTaskClick, onHandoff }) {
             </div>
           </div>
         </div>
+
+        {/* Copy Prompt button (Milestone 10 copy-prompt) */}
+        {(task.context || task.description) && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onCopyPrompt(task); }}
+            title="Copy as Prompt Context"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:text-brand-accent hover:bg-brand-primary/15 border border-transparent hover:border-brand-primary/25 active:scale-95 transition-all"
+            aria-label="Copy prompt context"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        )}
       </div>
     </article>
   );
@@ -746,7 +815,7 @@ function TaskCard({ task, onTaskClick, onHandoff }) {
  * KanbanColumn Component
  * Renders one of the four columns with column header and list of cards.
  */
-function KanbanColumn({ stage, tasks, onTaskClick, onHandoff }) {
+function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt }) {
   const stageAccents = {
     'todo': 'bg-brand-accent',
     'in-progress': 'bg-due-warning',
@@ -780,6 +849,7 @@ function KanbanColumn({ stage, tasks, onTaskClick, onHandoff }) {
               task={task}
               onTaskClick={onTaskClick}
               onHandoff={onHandoff}
+              onCopyPrompt={onCopyPrompt}
             />
           ))
         ) : (
@@ -919,6 +989,26 @@ export default function App() {
     handleCloseViewModal();
   };
 
+  /**
+   * Milestone 10 copy-prompt: serialise task to Markdown and write to clipboard.
+   * Toast microcopy: "Prompt Copied" (DESIGN.md §5)
+   */
+  const handleCopyPrompt = async (task) => {
+    const markdown = buildPromptMarkdown(task);
+    try {
+      await navigator.clipboard.writeText(markdown);
+    } catch {
+      // Fallback for environments without clipboard API
+      const el = document.createElement('textarea');
+      el.value = markdown;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    triggerToast('Prompt Copied');
+  };
+
   return (
     <div className="min-h-screen bg-surface-page text-text-primary font-body p-4 sm:p-6 lg:p-8">
       {/* Header */}
@@ -964,6 +1054,7 @@ export default function App() {
               tasks={columnTasks}
               onTaskClick={handleOpenViewModal}
               onHandoff={handleHandoff}
+              onCopyPrompt={handleCopyPrompt}
             />
           );
         })}
@@ -976,6 +1067,7 @@ export default function App() {
         onEdit={handleStartEditFromView}
         onDelete={handleDeleteTask}
         onHandoff={handleHandoff}
+        onCopyPrompt={handleCopyPrompt}
         task={viewingTask}
       />
 
