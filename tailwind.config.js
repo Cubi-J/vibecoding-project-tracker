@@ -16,6 +16,7 @@ export default {
         surface: {
           page: '#0D0E11',      // Page background
           card: '#16181D',      // Card background
+          border: '#2A2E37',    // Subtle border on cards / empty states
         },
 
         // Typography Tokens
