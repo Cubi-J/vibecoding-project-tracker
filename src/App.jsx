@@ -137,11 +137,466 @@ function Toast({ toast, onClose }) {
 }
 
 /**
+ * Avatar Component
+ * Displays a teammate's profile picture if uploaded, or falls back to their initial letter.
+ * (e.g. "Teammate A" -> "A", "Teammate B" -> "B").
+ */
+function Avatar({ name, avatarUrl, size = 'sm', className = '', onClick }) {
+  const sizeClasses = {
+    xs: 'h-4 w-4 text-[9px]',
+    sm: 'h-5 w-5 text-[10px]',
+    md: 'h-7 w-7 text-xs',
+    lg: 'h-10 w-10 text-sm',
+    xl: 'h-14 w-14 text-base',
+  };
+
+  const selectedSize = sizeClasses[size] || sizeClasses.sm;
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || 'Teammate avatar'}
+        onClick={onClick}
+        className={`${selectedSize} rounded-full object-cover ring-1 ring-white/10 shrink-0 ${
+          onClick ? 'cursor-pointer hover:ring-brand-accent/60 transition-all' : ''
+        } ${className}`}
+      />
+    );
+  }
+
+  // Fallback initial: "Teammate A" -> "A", "Teammate B" -> "B", or "?"
+  const initial = name
+    ? name.replace(/^Teammate\s+/i, '').charAt(0).toUpperCase() || name.charAt(0).toUpperCase()
+    : '?';
+
+  return (
+    <div
+      onClick={onClick}
+      className={`flex ${selectedSize} items-center justify-center rounded-full bg-surface-border font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0 ${
+        onClick ? 'cursor-pointer hover:bg-surface-border/80 hover:ring-brand-accent/40 transition-all' : ''
+      } ${className}`}
+    >
+      {initial}
+    </div>
+  );
+}
+
+/**
+ * Preset avatar choices for quick fun setup (Secret Sauce)
+ */
+const AVATAR_PRESETS = [
+  {
+    name: 'Cyberpunk Violet',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%236366F1"/><circle cx="32" cy="24" r="12" fill="%23A5B4FC"/><path d="M14 54c0-10 8-16 18-16s18 6 18 16" fill="%234338CA"/><circle cx="28" cy="23" r="2.5" fill="%2306B6D4"/><circle cx="36" cy="23" r="2.5" fill="%2306B6D4"/><rect x="25" y="29" width="14" height="2" rx="1" fill="%23F43F5E"/></svg>',
+  },
+  {
+    name: 'Neon Matrix',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%230F172A"/><circle cx="32" cy="24" r="12" fill="%2310B981"/><path d="M14 54c0-10 8-16 18-16s18 6 18 16" fill="%23047857"/><rect x="24" y="21" width="16" height="5" rx="2" fill="%2306B6D4"/><path d="M28 30h8" stroke="%2334D399" stroke-width="2" stroke-linecap="round"/></svg>',
+  },
+  {
+    name: 'Solar Flare',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%23F59E0B"/><circle cx="32" cy="24" r="12" fill="%23FEF3C7"/><path d="M14 54c0-10 8-16 18-16s18 6 18 16" fill="%23B45309"/><circle cx="28" cy="23" r="2.5" fill="%231E293B"/><circle cx="36" cy="23" r="2.5" fill="%231E293B"/><path d="M28 30c2 2 6 2 8 0" stroke="%23EF4444" stroke-width="2" stroke-linecap="round"/></svg>',
+  },
+  {
+    name: 'Electric Pink',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%23EC4899"/><circle cx="32" cy="24" r="12" fill="%23FCE7F3"/><path d="M14 54c0-10 8-16 18-16s18 6 18 16" fill="%23BE185D"/><circle cx="28" cy="22" r="2.5" fill="%236366F1"/><circle cx="36" cy="22" r="2.5" fill="%236366F1"/><path d="M27 29h10" stroke="%239333EA" stroke-width="2" stroke-linecap="round"/></svg>',
+  },
+];
+
+/**
+ * TeamAvatarsModal Component
+ * Allows uploading custom profile pictures for teammates (Secret Sauce).
+ * Includes automatic client-side canvas compression to ~128x128 keeping localStorage fast.
+ */
+/**
+ * TeamAvatarsModal Component
+ * Allows uploading custom profile pictures and adding, removing, and renaming teammates (Secret Sauce).
+ * Includes automatic client-side canvas compression to ~128x128 keeping localStorage fast.
+ */
+function TeamAvatarsModal({
+  isOpen,
+  onClose,
+  team,
+  teamAvatars,
+  onUpdateAvatar,
+  onAddTeammate,
+  onRenameTeammate,
+  onRemoveTeammate,
+  tasks,
+}) {
+  const [newMemberName, setNewMemberName] = useState('');
+  const [addError, setAddError] = useState('');
+  const [editingMember, setEditingMember] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [confirmDeleteMember, setConfirmDeleteMember] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleAddSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = newMemberName.trim();
+    if (!trimmed) {
+      setAddError('Name cannot be empty');
+      return;
+    }
+    if (team.some((m) => m.toLowerCase() === trimmed.toLowerCase())) {
+      setAddError('A teammate with this name already exists');
+      return;
+    }
+    onAddTeammate(trimmed);
+    setNewMemberName('');
+    setAddError('');
+  };
+
+  const handleStartEdit = (member) => {
+    setEditingMember(member);
+    setEditName(member);
+    setConfirmDeleteMember(null);
+  };
+
+  const handleSaveEdit = (member) => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    if (trimmed !== member) {
+      if (team.some((m) => m.toLowerCase() === trimmed.toLowerCase() && m !== member)) {
+        return;
+      }
+      onRenameTeammate(member, trimmed);
+    }
+    setEditingMember(null);
+  };
+
+  const handleFileUpload = (member, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 128;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        onUpdateAvatar(member, dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Manage Team & Profile Pictures"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl bg-surface-card border border-surface-border p-6 shadow-2xl space-y-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-surface-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary/20 text-brand-primary">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text-primary font-heading">
+                Manage Team & Photos
+              </h2>
+              <p className="text-xs text-text-muted">
+                Add, rename, remove teammates, and customize profile pictures
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-border/50 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Add New Teammate Form */}
+        <form onSubmit={handleAddSubmit} className="space-y-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Add new teammate name..."
+              value={newMemberName}
+              onChange={(e) => {
+                setNewMemberName(e.target.value);
+                if (addError) setAddError('');
+              }}
+              className="flex-1 bg-surface-page border border-surface-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 transition-colors"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-medium active:scale-95 transition-all shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Member
+            </button>
+          </div>
+          {addError && (
+            <p className="text-[11px] text-red-400 font-mono px-1">{addError}</p>
+          )}
+        </form>
+
+        {/* Teammates List */}
+        <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+          {team.map((member) => {
+            const avatarUrl = teamAvatars?.[member];
+            const assignedCount = tasks.filter((t) => t.assignee === member).length;
+            const inputId = `avatar-upload-${member.replace(/\s+/g, '-')}`;
+            const isEditingThis = editingMember === member;
+            const isConfirmingDelete = confirmDeleteMember === member;
+
+            return (
+              <div
+                key={member}
+                className="flex flex-col gap-2.5 p-3 rounded-xl bg-surface-page/60 border border-surface-border/80 transition-all"
+              >
+                {/* Top Row: Avatar + Name (or Edit input) + Delete button */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Avatar
+                      name={member}
+                      avatarUrl={avatarUrl}
+                      size="lg"
+                      className="ring-2 ring-brand-primary/30"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      {isEditingThis ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(member);
+                              if (e.key === 'Escape') setEditingMember(null);
+                            }}
+                            autoFocus
+                            className="bg-surface-page border border-brand-primary rounded px-2 py-1 text-xs text-text-primary focus:outline-none w-full max-w-[180px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(member)}
+                            title="Save name"
+                            className="p-1 rounded bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-primary transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingMember(null)}
+                            title="Cancel edit"
+                            className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-surface-border transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 group">
+                          <h3 className="text-sm font-semibold text-text-primary truncate">
+                            {member}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(member)}
+                            title="Rename teammate"
+                            className="text-text-muted hover:text-brand-accent p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-text-muted font-mono mt-0.5">
+                        {assignedCount} {assignedCount === 1 ? 'task' : 'tasks'} assigned
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Remove Button with Confirm */}
+                  <div>
+                    {isConfirmingDelete ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onRemoveTeammate(member);
+                            setConfirmDeleteMember(null);
+                          }}
+                          className="px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[11px] font-medium transition-colors"
+                          title="Confirm removal"
+                        >
+                          Remove
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteMember(null)}
+                          className="px-1.5 py-1 rounded text-text-muted hover:text-text-primary text-[11px] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteMember(member)}
+                        disabled={team.length <= 1}
+                        title={team.length <= 1 ? 'Cannot remove the only teammate' : `Remove ${member}`}
+                        className={`p-1.5 rounded-lg text-text-muted transition-colors ${
+                          team.length <= 1
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'hover:text-red-400 hover:bg-red-500/10'
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Row: Presets + Upload + Reset */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface-border/40">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono text-text-muted">Presets:</span>
+                    <div className="flex items-center gap-1">
+                      {AVATAR_PRESETS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => onUpdateAvatar(member, preset.url)}
+                          title={`Use ${preset.name} preset`}
+                          className="h-5 w-5 rounded-full overflow-hidden hover:scale-110 ring-1 ring-white/10 hover:ring-brand-accent transition-all"
+                        >
+                          <img src={preset.url} alt={preset.name} className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Upload file button */}
+                    <label
+                      htmlFor={inputId}
+                      className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand-primary/15 hover:bg-brand-primary/25 border border-brand-primary/30 text-[11px] font-medium text-brand-primary transition-all active:scale-95"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Upload
+                      <input
+                        id={inputId}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(member, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+
+                    {/* Reset button */}
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateAvatar(member, null)}
+                        title="Reset to default initial"
+                        className="px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="pt-3 border-t border-surface-border flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-medium transition-all active:scale-95"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * TaskDetailsModal Component
  * Dedicated read-only view for cleanly reading task details and AI prompt context.
  * Prevents accidental edits, with an "Edit Task" button and quick handoff selector.
  */
-function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, onCopyPrompt, task }) {
+function TaskDetailsModal({
+  isOpen,
+  onClose,
+  onEdit,
+  onDelete,
+  onHandoff,
+  onCopyPrompt,
+  task,
+  teamAvatars,
+  onOpenTeamModal,
+  team = TEAM,
+}) {
   // Close modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -237,9 +692,12 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, onCopy
                 Assignee
               </span>
               <div className="flex items-center gap-1.5 min-w-0 w-full">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
-                  {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
-                </div>
+                <Avatar
+                  name={task.assignee}
+                  avatarUrl={teamAvatars?.[task.assignee]}
+                  size="sm"
+                  onClick={task.assignee && onOpenTeamModal ? onOpenTeamModal : undefined}
+                />
                 <div className="relative min-w-0 flex-1">
                   <select
                     value={task.assignee || ''}
@@ -251,7 +709,7 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, onCopy
                       {task.assignee ? task.assignee : 'Hand off to...'}
                     </option>
                     {task.assignee && <option value="">Unassign</option>}
-                    {TEAM.map((member) => (
+                    {(team || TEAM).map((member) => (
                       <option key={member} value={member}>
                         {member === task.assignee ? `${member} (current)` : `Hand off to ${member}`}
                       </option>
@@ -407,7 +865,7 @@ function TaskDetailsModal({ isOpen, onClose, onEdit, onDelete, onHandoff, onCopy
  * TaskFormModal Component
  * Handles creating a new task or editing an existing task's fields.
  */
-function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
+function TaskFormModal({ isOpen, onClose, onSave, onDelete, task, teamAvatars, team = TEAM }) {
   const isEditing = Boolean(task);
 
   const [formData, setFormData] = useState({
@@ -596,16 +1054,28 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
           {/* Assignee & Due Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono font-medium text-text-muted uppercase tracking-wider mb-1.5">
-                Assignee
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-mono font-medium text-text-muted uppercase tracking-wider">
+                  Assignee
+                </label>
+                {formData.assignee && (
+                  <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                    <Avatar
+                      name={formData.assignee}
+                      avatarUrl={teamAvatars?.[formData.assignee]}
+                      size="xs"
+                    />
+                    <span className="text-[11px] font-mono">{formData.assignee}</span>
+                  </div>
+                )}
+              </div>
               <select
                 value={formData.assignee}
                 onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
                 className="w-full bg-surface-page border border-surface-border rounded-lg px-3.5 py-2.5 text-sm text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-colors"
               >
                 <option value="" className="bg-surface-card text-text-muted">Unassigned</option>
-                {TEAM.map((member) => (
+                {(team || TEAM).map((member) => (
                   <option key={member} value={member} className="bg-surface-card text-text-primary">
                     {member}
                   </option>
@@ -710,7 +1180,7 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
  * Supports HTML5 Drag & Drop (Secret Sauce) between columns.
  * Clicking the card opens the view details modal; clicking the handoff dropdown does not.
  */
-function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
+function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt, teamAvatars, onOpenTeamModal, team = TEAM }) {
   const [isDragging, setIsDragging] = useState(false);
   const typeConfig = getTypeConfig(task.type);
   const dueStatus = getDueStatus(task.dueDate, task.status);
@@ -798,15 +1268,18 @@ function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
 
       {/* Card Footer: Assignee + Copy Prompt icon */}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-surface-border/60 pt-2.5">
-        {/* Assignee badge + "Hand off to..." dropdown (Milestone 7 task-owner) */}
+        {/* Assignee avatar badge + "Hand off to..." dropdown (Milestone 7 task-owner & Secret Sauce) */}
         <div
           onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-1.5 min-w-0 flex-1"
-          title={task.assignee ? `Assigned to ${task.assignee} — click to hand off` : 'Unassigned — click to hand off'}
+          title={task.assignee ? `Assigned to ${task.assignee} — click photo to customize avatar` : 'Unassigned — click to hand off'}
         >
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-border text-[10px] font-mono font-medium text-text-primary ring-1 ring-white/10 shrink-0">
-            {task.assignee ? task.assignee.charAt(0).toUpperCase() : '?'}
-          </div>
+          <Avatar
+            name={task.assignee}
+            avatarUrl={teamAvatars?.[task.assignee]}
+            size="sm"
+            onClick={task.assignee && onOpenTeamModal ? onOpenTeamModal : undefined}
+          />
 
           <div className="relative inline-flex items-center flex-1 min-w-0">
             <select
@@ -819,7 +1292,7 @@ function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
                 {task.assignee ? task.assignee : 'Hand off to...'}
               </option>
               {task.assignee && <option value="">Unassign</option>}
-              {TEAM.map((member) => (
+              {(team || TEAM).map((member) => (
                 <option key={member} value={member}>
                   {member === task.assignee ? `${member} (current)` : `Hand off to ${member}`}
                 </option>
@@ -857,7 +1330,17 @@ function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
  * Renders one of the four columns with column header and list of cards.
  * Supports HTML5 Drag & Drop with animated drop-zone highlighting.
  */
-function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt, onMoveTask }) {
+function KanbanColumn({
+  stage,
+  tasks,
+  onTaskClick,
+  onHandoff,
+  onCopyPrompt,
+  onMoveTask,
+  teamAvatars,
+  onOpenTeamModal,
+  team = TEAM,
+}) {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const stageAccents = {
@@ -925,6 +1408,9 @@ function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt, onMo
               onTaskClick={onTaskClick}
               onHandoff={onHandoff}
               onCopyPrompt={onCopyPrompt}
+              teamAvatars={teamAvatars}
+              onOpenTeamModal={onOpenTeamModal}
+              team={team}
             />
           ))
         ) : (
@@ -1165,6 +1651,84 @@ export default function App() {
   // Milestone 11: Deliverable Anchor Board persisted to localStorage
   const [anchors, setAnchors] = useLocalStorage(STORAGE_KEYS.anchors, seedAnchors);
 
+  // Secret Sauce: Teammate profile pictures / avatars persisted to localStorage
+  const [teamAvatars, setTeamAvatars] = useLocalStorage(STORAGE_KEYS.teamAvatars, {});
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+
+  // Secret Sauce: Custom team members list persisted to localStorage
+  const [team, setTeam] = useLocalStorage(STORAGE_KEYS.team, TEAM);
+
+  // Safe team list fallback
+  const effectiveTeam = Array.isArray(team) && team.length > 0 ? team : TEAM;
+
+  // Handler: Add Teammate
+  const handleAddTeammate = (name) => {
+    setTeam((prev) => {
+      const current = Array.isArray(prev) && prev.length > 0 ? prev : TEAM;
+      return [...current, name];
+    });
+    triggerToast(`Teammate "${name}" added to the team!`);
+  };
+
+  // Handler: Rename Teammate
+  const handleRenameTeammate = (oldName, newName) => {
+    // 1. Update team list
+    setTeam((prev) => {
+      const current = Array.isArray(prev) && prev.length > 0 ? prev : TEAM;
+      return current.map((m) => (m === oldName ? newName : m));
+    });
+
+    // 2. Migrate avatar if present
+    setTeamAvatars((prev) => {
+      const next = { ...(prev || {}) };
+      if (next[oldName]) {
+        next[newName] = next[oldName];
+        delete next[oldName];
+      }
+      return next;
+    });
+
+    // 3. Update any tasks assigned to oldName
+    setTasks((prev) =>
+      prev.map((t) => (t.assignee === oldName ? { ...t, assignee: newName } : t))
+    );
+
+    // 4. Update viewingTask if open
+    setViewingTask((prev) =>
+      prev && prev.assignee === oldName ? { ...prev, assignee: newName } : prev
+    );
+
+    triggerToast(`Renamed "${oldName}" to "${newName}"`);
+  };
+
+  // Handler: Remove Teammate
+  const handleRemoveTeammate = (name) => {
+    // 1. Update team list
+    setTeam((prev) => {
+      const current = Array.isArray(prev) && prev.length > 0 ? prev : TEAM;
+      return current.filter((m) => m !== name);
+    });
+
+    // 2. Remove avatar
+    setTeamAvatars((prev) => {
+      const next = { ...(prev || {}) };
+      delete next[name];
+      return next;
+    });
+
+    // 3. Unassign tasks currently assigned to this teammate
+    setTasks((prev) =>
+      prev.map((t) => (t.assignee === name ? { ...t, assignee: null } : t))
+    );
+
+    // 4. Update viewingTask if open
+    setViewingTask((prev) =>
+      prev && prev.assignee === name ? { ...prev, assignee: null } : prev
+    );
+
+    triggerToast(`Removed "${name}" from team`);
+  };
+
   // View details modal state (separate modal to view task without accidental edits)
   const [viewingTask, setViewingTask] = useState(null);
 
@@ -1201,6 +1765,19 @@ export default function App() {
     const found = Array.isArray(anchors) ? anchors.find((a) => a.id === seed.id) : null;
     return found || seed;
   });
+
+  // Handler for updating / clearing a teammate's avatar
+  const handleUpdateAvatar = (member, avatarUrl) => {
+    setTeamAvatars((prev) => {
+      const next = { ...(prev || {}) };
+      if (avatarUrl) {
+        next[member] = avatarUrl;
+      } else {
+        delete next[member];
+      }
+      return next;
+    });
+  };
 
   const handleOpenCreateModal = () => {
     setViewingTask(null);
@@ -1347,7 +1924,30 @@ export default function App() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Teammate Profile Pictures & Management (Secret Sauce) */}
+          <button
+            type="button"
+            onClick={() => setIsTeamModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-card hover:bg-surface-border/60 border border-surface-border text-xs text-text-primary transition-all duration-150 active:scale-95 shadow-sm group"
+            title="Manage team members and profile pictures"
+          >
+            <div className="flex -space-x-1.5 overflow-hidden">
+              {effectiveTeam.map((member) => (
+                <Avatar
+                  key={member}
+                  name={member}
+                  avatarUrl={teamAvatars[member]}
+                  size="xs"
+                  className="ring-2 ring-surface-card"
+                />
+              ))}
+            </div>
+            <span className="font-medium text-text-muted group-hover:text-text-primary">
+              Team ({effectiveTeam.length})
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={handleOpenCreateModal}
@@ -1380,6 +1980,9 @@ export default function App() {
               onHandoff={handleHandoff}
               onCopyPrompt={handleCopyPrompt}
               onMoveTask={handleMoveTask}
+              teamAvatars={teamAvatars}
+              onOpenTeamModal={() => setIsTeamModalOpen(true)}
+              team={effectiveTeam}
             />
           );
         })}
@@ -1394,6 +1997,9 @@ export default function App() {
         onHandoff={handleHandoff}
         onCopyPrompt={handleCopyPrompt}
         task={viewingTask}
+        teamAvatars={teamAvatars}
+        onOpenTeamModal={() => setIsTeamModalOpen(true)}
+        team={effectiveTeam}
       />
 
       {/* Add / Edit Task Form Modal */}
@@ -1403,6 +2009,21 @@ export default function App() {
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
         task={editingTask}
+        teamAvatars={teamAvatars}
+        team={effectiveTeam}
+      />
+
+      {/* Team Avatars & Management Modal (Secret Sauce) */}
+      <TeamAvatarsModal
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        team={effectiveTeam}
+        teamAvatars={teamAvatars}
+        onUpdateAvatar={handleUpdateAvatar}
+        onAddTeammate={handleAddTeammate}
+        onRenameTeammate={handleRenameTeammate}
+        onRemoveTeammate={handleRemoveTeammate}
+        tasks={tasks}
       />
 
       {/* Toast Notification (Handoff alert, etc.) */}

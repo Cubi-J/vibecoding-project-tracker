@@ -31,6 +31,8 @@
 export const STORAGE_KEYS = {
   tasks: 'vibetracker.tasks',
   anchors: 'vibetracker.anchors',
+  teamAvatars: 'vibetracker.team_avatars',
+  team: 'vibetracker.team',
 };
 
 /* ———————————————————————————————————————————————————————
