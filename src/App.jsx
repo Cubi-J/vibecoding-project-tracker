@@ -707,25 +707,66 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task }) {
 /**
  * TaskCard Component
  * Displays a single task card with assignee badge and inline "Hand off to..." dropdown.
+ * Supports HTML5 Drag & Drop (Secret Sauce) between columns.
  * Clicking the card opens the view details modal; clicking the handoff dropdown does not.
  */
 function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
+  const [isDragging, setIsDragging] = useState(false);
   const typeConfig = getTypeConfig(task.type);
   const dueStatus = getDueStatus(task.dueDate, task.status);
 
+  const handleDragStart = (e) => {
+    // If dragging starts from select dropdown or button, cancel drag to allow normal click
+    if (e.target.closest('select, button, a')) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('text/plain', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
     <article
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={() => onTaskClick(task)}
-      className={`group relative rounded-lg border bg-surface-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 shadow-sm cursor-pointer ${dueStatus.borderClass}`}
+      className={`group relative rounded-lg border bg-surface-card p-3.5 transition-all duration-200 hover:-translate-y-0.5 shadow-sm cursor-grab active:cursor-grabbing ${
+        isDragging
+          ? 'opacity-40 scale-95 border-dashed border-brand-primary ring-2 ring-brand-primary/30'
+          : dueStatus.borderClass
+      }`}
     >
-      {/* Top row: Type badge & Due Date (Milestone 8 due-tint) */}
+      {/* Top row: Type badge, Due Date, and Drag affordance */}
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 mb-2.5">
-        <span
-          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
-          {typeConfig.label}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono uppercase tracking-wider font-semibold ${typeConfig.badgeClass}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${typeConfig.dotClass}`} />
+            {typeConfig.label}
+          </span>
+          {/* Subtle drag handle affordance visible on hover */}
+          <span
+            className="opacity-0 group-hover:opacity-60 transition-opacity text-text-muted hover:text-text-primary"
+            title="Drag to move between columns"
+            aria-hidden="true"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="7" r="1.5" />
+              <circle cx="15" cy="7" r="1.5" />
+              <circle cx="9" cy="12" r="1.5" />
+              <circle cx="15" cy="12" r="1.5" />
+              <circle cx="9" cy="17" r="1.5" />
+              <circle cx="15" cy="17" r="1.5" />
+            </svg>
+          </span>
+        </div>
 
         {task.dueDate && (
           <div
@@ -814,8 +855,11 @@ function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt }) {
 /**
  * KanbanColumn Component
  * Renders one of the four columns with column header and list of cards.
+ * Supports HTML5 Drag & Drop with animated drop-zone highlighting.
  */
-function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt }) {
+function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt, onMoveTask }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const stageAccents = {
     'todo': 'bg-brand-accent',
     'in-progress': 'bg-due-warning',
@@ -825,8 +869,39 @@ function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt }) {
 
   const accentDot = stageAccents[stage.id] || 'bg-slate-400';
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    // Only turn off highlight if drag leaves the column container entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (taskId && onMoveTask) {
+      onMoveTask(taskId, stage.id);
+    }
+  };
+
   return (
-    <section className="flex flex-col rounded-xl bg-surface-card/30 border border-surface-border/60 p-3 sm:p-4 min-h-[500px]">
+    <section
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`flex flex-col rounded-xl border p-3 sm:p-4 min-h-[500px] transition-all duration-200 ${
+        isDragOver
+          ? 'bg-brand-primary/10 border-brand-accent ring-2 ring-brand-accent/40 shadow-xl shadow-brand-accent/5'
+          : 'bg-surface-card/30 border-surface-border/60'
+      }`}
+    >
       {/* Column Header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-surface-border/50">
         <div className="flex items-center gap-2.5">
@@ -1225,6 +1300,16 @@ export default function App() {
   };
 
   /**
+   * Secret Sauce: Move a task to a different Kanban stage via Drag & Drop.
+   * If the stage changed, update state and localStorage automatically.
+   */
+  const handleMoveTask = (taskId, newStatus) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId && t.status !== newStatus ? { ...t, status: newStatus } : t))
+    );
+  };
+
+  /**
    * Milestone 10 copy-prompt: serialise task to Markdown and write to clipboard.
    * Toast microcopy: "Prompt Copied" (DESIGN.md §5)
    */
@@ -1294,6 +1379,7 @@ export default function App() {
               onTaskClick={handleOpenViewModal}
               onHandoff={handleHandoff}
               onCopyPrompt={handleCopyPrompt}
+              onMoveTask={handleMoveTask}
             />
           );
         })}
