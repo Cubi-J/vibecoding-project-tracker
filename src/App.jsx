@@ -862,9 +862,233 @@ function KanbanColumn({ stage, tasks, onTaskClick, onHandoff, onCopyPrompt }) {
   );
 }
 
+/**
+ * AnchorCard Component
+ * Represents a single project deliverable (Presentation, Demo, Report, Documentation).
+ * Features:
+ * - Fixed slot label and contextual icon
+ * - Visual status indicator: empty ring dot vs. vibrant filled dot (PRD §1.1)
+ * - Single URL input field for storing deliverable link (PRD §1.1)
+ * - Convenient open-in-new-tab and clear actions when link is present
+ */
+function AnchorCard({ anchor, onUpdateUrl }) {
+  const hasLink = Boolean(anchor.url && anchor.url.trim().length > 0);
+
+  // Helper to ensure external URLs open with http/https protocol
+  const getHref = (url) => {
+    if (!url) return '#';
+    const trimmed = url.trim();
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
+  const getAnchorIcon = (id) => {
+    switch (id) {
+      case 'presentation':
+        // Slides / Presentation screen icon
+        return (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+          </svg>
+        );
+      case 'demo':
+        // Play / Demo icon
+        return (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'report':
+        // Document / Bar chart report icon
+        return (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        );
+      case 'documentation':
+        // Book / Library docs icon
+        return (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+          </svg>
+        );
+    }
+  };
+
+  return (
+    <div
+      className={`flex flex-col justify-between rounded-xl bg-surface-card border p-3 transition-all duration-150 ${
+        hasLink
+          ? 'border-brand-primary/40 shadow-sm shadow-brand-primary/5 hover:border-brand-primary/70'
+          : 'border-surface-border hover:border-surface-border/90'
+      }`}
+    >
+      {/* Top Header: Icon + Label + Status Indicator */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+              hasLink ? 'bg-brand-primary/20 text-brand-primary' : 'bg-surface-border text-text-muted'
+            }`}
+          >
+            {getAnchorIcon(anchor.id)}
+          </span>
+          <span className="font-heading font-semibold text-xs text-text-primary truncate">
+            {anchor.label}
+          </span>
+        </div>
+
+        {/* Status Indicator (empty vs. filled dot per PRD §1.1) */}
+        <div
+          className="flex items-center gap-1.5 shrink-0"
+          title={hasLink ? 'Deliverable link provided' : 'No link provided'}
+        >
+          {hasLink ? (
+            <span
+              data-testid={`anchor-dot-${anchor.id}`}
+              className="inline-flex items-center gap-1 text-[11px] font-mono text-type-feature font-medium"
+            >
+              <span className="h-2 w-2 rounded-full bg-type-feature shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+              <span className="hidden sm:inline text-[10px]">Ready</span>
+            </span>
+          ) : (
+            <span
+              data-testid={`anchor-dot-${anchor.id}`}
+              className="inline-flex items-center gap-1 text-[11px] font-mono text-text-muted"
+            >
+              <span className="h-2 w-2 rounded-full border border-slate-500 bg-transparent" />
+              <span className="hidden sm:inline text-[10px]">Empty</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* URL input field */}
+      <div className="relative flex items-center">
+        <input
+          type="url"
+          id={`anchor-input-${anchor.id}`}
+          placeholder="https://..."
+          value={anchor.url || ''}
+          onChange={(e) => onUpdateUrl(anchor.id, e.target.value)}
+          aria-label={`${anchor.label} deliverable URL`}
+          className="w-full bg-surface-page/90 hover:bg-surface-page border border-surface-border rounded-lg pl-2.5 pr-14 py-1.5 text-xs text-text-primary placeholder:text-text-muted/50 font-mono transition-colors focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
+        />
+
+        {/* Action buttons inside the input: Open link & Clear */}
+        <div className="absolute right-1.5 flex items-center gap-1">
+          {hasLink && (
+            <>
+              <button
+                type="button"
+                onClick={() => onUpdateUrl(anchor.id, '')}
+                title="Clear URL"
+                aria-label={`Clear ${anchor.label} URL`}
+                className="text-text-muted hover:text-text-primary p-0.5 rounded transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <a
+                href={getHref(anchor.url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${anchor.label} link in new tab`}
+                aria-label={`Open ${anchor.label} link in new tab`}
+                className="text-brand-accent hover:text-cyan-300 p-0.5 rounded hover:bg-brand-accent/10 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * DeliverableAnchorBoard Component
+ * Pinned above the Kanban columns.
+ * Displays 4 deliverable cards: Presentation, Demo, Report, Documentation.
+ * Provides high-level progress count (e.g. "X / 4 ready") and persists URLs via localStorage.
+ */
+function DeliverableAnchorBoard({ anchors, onUpdateAnchor }) {
+  const completedCount = anchors.filter((a) => Boolean(a.url && a.url.trim().length > 0)).length;
+
+  return (
+    <section
+      aria-label="Deliverables Anchor Board"
+      className="sticky top-2 z-20 mb-8 rounded-2xl bg-surface-page/95 backdrop-blur-md border border-surface-border/80 p-3.5 sm:p-4 shadow-xl shadow-black/40"
+    >
+      <div className="flex items-center justify-between gap-3 mb-3 pb-2.5 border-b border-surface-border/50">
+        <div className="flex items-center gap-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded bg-brand-primary/20 text-brand-primary text-xs">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-primary font-heading">
+            Deliverables Anchor Board
+          </h2>
+          <span className="hidden sm:inline-block text-[11px] text-text-muted">
+            Pinned Deliverables
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] font-medium text-text-muted">
+            <span
+              className={
+                completedCount === 4
+                  ? 'text-type-feature font-bold'
+                  : completedCount > 0
+                  ? 'text-brand-accent font-bold'
+                  : 'text-text-muted'
+              }
+            >
+              {completedCount}
+            </span>
+            <span className="text-text-muted/60"> / 4 ready</span>
+          </span>
+          {completedCount === 4 && (
+            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-type-feature/15 border border-type-feature/30 text-[10px] font-mono text-type-feature font-semibold">
+              <span className="h-1.5 w-1.5 rounded-full bg-type-feature" />
+              All Complete
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 4 Deliverable Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {anchors.map((anchor) => (
+          <AnchorCard
+            key={anchor.id}
+            anchor={anchor}
+            onUpdateUrl={onUpdateAnchor}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   // Milestone 4: Load tasks persisted to localStorage, seeded with initial mock tasks
   const [tasks, setTasks] = useLocalStorage(STORAGE_KEYS.tasks, seedTasks);
+
+  // Milestone 11: Deliverable Anchor Board persisted to localStorage
+  const [anchors, setAnchors] = useLocalStorage(STORAGE_KEYS.anchors, seedAnchors);
 
   // View details modal state (separate modal to view task without accidental edits)
   const [viewingTask, setViewingTask] = useState(null);
@@ -889,8 +1113,19 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // TODO M11 anchors:
-  //   const [anchors, setAnchors] = useLocalStorage(STORAGE_KEYS.anchors, seedAnchors);
+  // Handler for updating an anchor URL
+  const handleUpdateAnchor = (id, newUrl) => {
+    setAnchors((prev) => {
+      const list = Array.isArray(prev) && prev.length > 0 ? prev : seedAnchors;
+      return list.map((a) => (a.id === id ? { ...a, url: newUrl } : a));
+    });
+  };
+
+  // Safe fallback ensuring all 4 seed deliverables are present
+  const effectiveAnchors = seedAnchors.map((seed) => {
+    const found = Array.isArray(anchors) ? anchors.find((a) => a.id === seed.id) : null;
+    return found || seed;
+  });
 
   const handleOpenCreateModal = () => {
     setViewingTask(null);
@@ -1041,7 +1276,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* TODO M11 anchors: Render the Deliverable Anchor Board (Presentation / Demo / Report / Documentation) */}
+      {/* Deliverable Anchor Board pinned above the Kanban Columns (Milestone 11) */}
+      <DeliverableAnchorBoard
+        anchors={effectiveAnchors}
+        onUpdateAnchor={handleUpdateAnchor}
+      />
 
       {/* Four-Column Kanban Board Layout */}
       <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
