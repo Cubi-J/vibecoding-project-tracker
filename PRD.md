@@ -9,6 +9,9 @@
 * **Deliverable Anchor Board:** Pinned banner at the top of the board displaying four deliverable cards: **Presentation**, **Demo**, **Report**, and **Documentation**.
   * Each anchor card includes a single URL input field to store relevant project links.
   * Displays a visual status indicator (e.g., empty vs. filled dot) indicating whether a link has been provided.
+* **Login / Authentication** Basic authentication (login screen) allowing users to log into their team 
+  * workspace to protect project board data from public internet exposure. Security not needed yet
+
 
 ### 1.2 Task Management & Modal (CRUD)
 * **Create Task:** Global "+" button opens a modal allowing creation of new tasks.
@@ -36,7 +39,6 @@
 
 ## 2. Non-Functional Requirements
 
-* **Single-User Scope:** Tailored exclusively for a single developer workflow (no multi-user authorization, team assignments, or handoffs).
 * **Architecture & Stack:** 
   * Single-Page Web Application built using **React** (Vite scaffold).
   * UI styled with **Tailwind CSS** using utility classes.
@@ -44,7 +46,7 @@
 * **Deployment Target:** Hosted and deployed on **Vercel** with continuous deployment from GitHub.
 * **Viewport Scope:** Designed and optimized for **desktop browsers** (Chrome recommended).
 * **Performance:** Instant loading and card state rendering without blocking operations.
-* **Out of Scope:** Multi-user accounts, authentication, backend database, real-time sync, and mobile responsiveness.
+
 
 ---
 
