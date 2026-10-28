@@ -35,6 +35,12 @@
 * **Copy Context Button:** Action button available on task cards and inside the modal that copies a structured Markdown prompt block (Title, Description, and Context) directly to clipboard.
 * **Feedback:** Toast notification confirming "Copied to clipboard!" when the action succeeds.
 
+### 1.5 Team & User Profile Management
+* **User Profile Fields:** Support storing basic team member profile information, specifically **Name**, **Email Address**, and **GitHub Username**.
+* **Profile Editing:** Interface within the team management modal allowing users to edit names, email addresses, and GitHub usernames, as well as add new members with full profile details.
+* **Prepopulated Profiles:** Default seed profiles configured for initial team members with sample contact and GitHub details.
+* **Local Persistence:** Preserved in `localStorage` under `vibetracker.team_profiles`.
+
 ---
 
 ## 2. Non-Functional Requirements

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import LoginPage from './LoginPage';
 import {
   STAGES,
   STATUS,
@@ -8,6 +9,7 @@ import {
   STORAGE_KEYS,
   seedTasks,
   seedAnchors,
+  seedTeamProfiles,
   getDueStatus,
 } from './model';
 
@@ -148,7 +150,7 @@ function Avatar({ name, avatarUrl, size = 'sm', className = '', onClick }) {
     md: 'h-7 w-7 text-xs',
     lg: 'h-10 w-10 text-sm',
     xl: 'h-14 w-14 text-base',
-  };
+  }
 
   const selectedSize = sizeClasses[size] || sizeClasses.sm;
 
@@ -219,16 +221,24 @@ function TeamAvatarsModal({
   onClose,
   team,
   teamAvatars,
+  teamProfiles = {},
   onUpdateAvatar,
   onAddTeammate,
+  onUpdateTeammateProfile,
   onRenameTeammate,
   onRemoveTeammate,
   tasks,
 }) {
   const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberGithub, setNewMemberGithub] = useState('');
   const [addError, setAddError] = useState('');
+
   const [editingMember, setEditingMember] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editGithub, setEditGithub] = useState('');
+  const [editError, setEditError] = useState('');
   const [confirmDeleteMember, setConfirmDeleteMember] = useState(null);
 
   useEffect(() => {
@@ -243,6 +253,16 @@ function TeamAvatarsModal({
 
   if (!isOpen) return null;
 
+  const getMemberProfile = (member) => {
+    return (
+      teamProfiles?.[member] || {
+        name: member,
+        email: `${member.toLowerCase().replace(/\s+/g, '.')}@vibecoding.dev`,
+        github: member.toLowerCase().replace(/\s+/g, '-'),
+      }
+    );
+  };
+
   const handleAddSubmit = (e) => {
     e.preventDefault();
     const trimmed = newMemberName.trim();
@@ -254,27 +274,44 @@ function TeamAvatarsModal({
       setAddError('A teammate with this name already exists');
       return;
     }
-    onAddTeammate(trimmed);
+    onAddTeammate(trimmed, newMemberEmail.trim(), newMemberGithub.trim());
     setNewMemberName('');
+    setNewMemberEmail('');
+    setNewMemberGithub('');
     setAddError('');
   };
 
   const handleStartEdit = (member) => {
     setEditingMember(member);
-    setEditName(member);
+    const prof = getMemberProfile(member);
+    setEditName(prof.name || member);
+    setEditEmail(prof.email || '');
+    setEditGithub(prof.github || '');
+    setEditError('');
     setConfirmDeleteMember(null);
   };
 
   const handleSaveEdit = (member) => {
     const trimmed = editName.trim();
-    if (!trimmed) return;
-    if (trimmed !== member) {
-      if (team.some((m) => m.toLowerCase() === trimmed.toLowerCase() && m !== member)) {
-        return;
-      }
+    if (!trimmed) {
+      setEditError('Name cannot be empty');
+      return;
+    }
+    if (team.some((m) => m.toLowerCase() === trimmed.toLowerCase() && m !== member)) {
+      setEditError('A teammate with this name already exists');
+      return;
+    }
+    if (onUpdateTeammateProfile) {
+      onUpdateTeammateProfile(member, {
+        name: trimmed,
+        email: editEmail.trim(),
+        github: editGithub.trim(),
+      });
+    } else if (trimmed !== member) {
       onRenameTeammate(member, trimmed);
     }
     setEditingMember(null);
+    setEditError('');
   };
 
   const handleFileUpload = (member, file) => {
@@ -314,7 +351,7 @@ function TeamAvatarsModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Manage Team & Profile Pictures"
+      aria-label="Manage Team & Profiles"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
@@ -332,10 +369,10 @@ function TeamAvatarsModal({
             </div>
             <div>
               <h2 className="text-base font-semibold text-text-primary font-heading">
-                Manage Team & Photos
+                Manage Team & Profiles
               </h2>
               <p className="text-xs text-text-muted">
-                Add, rename, remove teammates, and customize profile pictures
+                Add, edit member profiles (Name, Email, GitHub), and customize avatars
               </p>
             </div>
           </div>
@@ -351,28 +388,52 @@ function TeamAvatarsModal({
           </button>
         </div>
 
-        {/* Add New Teammate Form */}
-        <form onSubmit={handleAddSubmit} className="space-y-1">
-          <div className="flex items-center gap-2">
+        {/* Add New Teammate Form (PRD §1.5) */}
+        <form onSubmit={handleAddSubmit} className="space-y-2 p-3 rounded-xl bg-surface-page/50 border border-surface-border">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono text-text-muted uppercase tracking-wider">
+              Add New Team Member
+            </span>
+            <span className="text-[10px] text-text-muted/60 font-mono">
+              Name required · Email &amp; GitHub optional
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input
               type="text"
-              placeholder="Add new teammate name..."
+              placeholder="Name (e.g. Alex Chen) *"
               value={newMemberName}
               onChange={(e) => {
                 setNewMemberName(e.target.value);
                 if (addError) setAddError('');
               }}
-              className="flex-1 bg-surface-page border border-surface-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 transition-colors"
+              className="bg-surface-page border border-surface-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 transition-colors"
             />
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-medium active:scale-95 transition-all shrink-0"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Member
-            </button>
+            <input
+              type="email"
+              placeholder="Email address"
+              value={newMemberEmail}
+              onChange={(e) => setNewMemberEmail(e.target.value)}
+              className="bg-surface-page border border-surface-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 transition-colors"
+            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                placeholder="GitHub handle"
+                value={newMemberGithub}
+                onChange={(e) => setNewMemberGithub(e.target.value)}
+                className="flex-1 min-w-0 bg-surface-page border border-surface-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 transition-colors"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-medium active:scale-95 transition-all shrink-0 shadow-sm shadow-brand-primary/20"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add</span>
+              </button>
+            </div>
           </div>
           {addError && (
             <p className="text-[11px] text-red-400 font-mono px-1">{addError}</p>
@@ -383,6 +444,7 @@ function TeamAvatarsModal({
         <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
           {team.map((member) => {
             const avatarUrl = teamAvatars?.[member];
+            const profile = getMemberProfile(member);
             const assignedCount = tasks.filter((t) => t.assignee === member).length;
             const inputId = `avatar-upload-${member.replace(/\s+/g, '-')}`;
             const isEditingThis = editingMember === member;
@@ -393,73 +455,130 @@ function TeamAvatarsModal({
                 key={member}
                 className="flex flex-col gap-2.5 p-3 rounded-xl bg-surface-page/60 border border-surface-border/80 transition-all"
               >
-                {/* Top Row: Avatar + Name (or Edit input) + Delete button */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Top Row: Avatar + Name / Profile Info + Delete button */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
                     <Avatar
                       name={member}
                       avatarUrl={avatarUrl}
                       size="lg"
-                      className="ring-2 ring-brand-primary/30"
+                      className="ring-2 ring-brand-primary/30 mt-0.5"
                     />
 
-                    <div className="min-w-0 flex-1">
-                      {isEditingThis ? (
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit(member);
-                              if (e.key === 'Escape') setEditingMember(null);
-                            }}
-                            autoFocus
-                            className="bg-surface-page border border-brand-primary rounded px-2 py-1 text-xs text-text-primary focus:outline-none w-full max-w-[180px]"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(member)}
-                            title="Save name"
-                            className="p-1 rounded bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-primary transition-colors"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </button>
+                    {isEditingThis ? (
+                      <div className="flex-1 space-y-2 bg-surface-card p-2.5 rounded-lg border border-brand-primary/40 min-w-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-mono text-text-muted mb-0.5">Name *</label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="Full Name"
+                              className="w-full bg-surface-page border border-surface-border focus:border-brand-primary rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-text-muted mb-0.5">Email Address</label>
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={(e) => setEditEmail(e.target.value)}
+                              placeholder="email@example.com"
+                              className="w-full bg-surface-page border border-surface-border focus:border-brand-primary rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-mono text-text-muted mb-0.5">GitHub Username</label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted text-xs">@</span>
+                              <input
+                                type="text"
+                                value={editGithub}
+                                onChange={(e) => setEditGithub(e.target.value)}
+                                placeholder="username"
+                                className="w-full bg-surface-page border border-surface-border focus:border-brand-primary rounded pl-6 pr-2 py-1 text-xs text-text-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        {editError && (
+                          <p className="text-[11px] text-red-400 font-mono">{editError}</p>
+                        )}
+                        <div className="flex items-center justify-end gap-1.5 pt-1">
                           <button
                             type="button"
                             onClick={() => setEditingMember(null)}
-                            title="Cancel edit"
-                            className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-surface-border transition-colors"
+                            className="px-2.5 py-1 text-xs rounded text-text-muted hover:text-text-primary hover:bg-surface-border transition-colors"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(member)}
+                            className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded bg-brand-primary hover:bg-brand-primary/90 text-white font-medium transition-all active:scale-95 shadow-sm shadow-brand-primary/20"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
+                            Save Profile
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 group">
+                      </div>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-sm font-semibold text-text-primary truncate">
                             {member}
                           </h3>
                           <button
                             type="button"
                             onClick={() => handleStartEdit(member)}
-                            title="Rename teammate"
-                            className="text-text-muted hover:text-brand-accent p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
+                            title="Edit profile (Name, Email, GitHub)"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-primary hover:text-brand-primary/80 bg-brand-primary/10 hover:bg-brand-primary/20 px-1.5 py-0.5 rounded transition-colors"
                           >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
+                            <span>Edit Profile</span>
                           </button>
                         </div>
-                      )}
 
-                      <p className="text-[11px] text-text-muted font-mono mt-0.5">
-                        {assignedCount} {assignedCount === 1 ? 'task' : 'tasks'} assigned
-                      </p>
-                    </div>
+                        {/* Stored Profile Fields: Email & GitHub (PRD §1.5) */}
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted flex-wrap">
+                          {profile.email && (
+                            <a
+                              href={`mailto:${profile.email}`}
+                              className="inline-flex items-center gap-1 hover:text-brand-accent transition-colors truncate max-w-[200px]"
+                              title={`Email: ${profile.email}`}
+                            >
+                              <svg className="w-3.5 h-3.5 text-brand-accent/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              <span className="truncate">{profile.email}</span>
+                            </a>
+                          )}
+                          {profile.github && (
+                            <a
+                              href={`https://github.com/${profile.github}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 hover:text-text-primary transition-colors font-mono text-[11px] bg-surface-card px-1.5 py-0.5 rounded border border-surface-border/60"
+                              title={`GitHub: @${profile.github}`}
+                            >
+                              <svg className="w-3.5 h-3.5 text-text-muted shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                              </svg>
+                              <span>@{profile.github}</span>
+                            </a>
+                          )}
+                          <span className="text-[11px] text-text-muted font-mono">
+                            {assignedCount} {assignedCount === 1 ? 'task' : 'tasks'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Remove Button with Confirm */}
@@ -580,11 +699,6 @@ function TeamAvatarsModal({
   );
 }
 
-/**
- * TaskDetailsModal Component
- * Dedicated read-only view for cleanly reading task details and AI prompt context.
- * Prevents accidental edits, with an "Edit Task" button and quick handoff selector.
- */
 function TaskDetailsModal({
   isOpen,
   onClose,
@@ -596,12 +710,13 @@ function TaskDetailsModal({
   teamAvatars,
   onOpenTeamModal,
   team = TEAM,
+  teamProfiles = {},
 }) {
   // Close modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
-    };
+    }
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -619,7 +734,7 @@ function TaskDetailsModal({
     'in-progress': 'bg-due-warning',
     'review': 'bg-brand-primary',
     'done': 'bg-type-feature',
-  };
+  }
 
   const accentDot = stageAccents[task.status] || 'bg-slate-400';
 
@@ -627,7 +742,7 @@ function TaskDetailsModal({
     if (window.confirm('Delete Task? This cannot be undone.')) {
       onDelete(task.id);
     }
-  };
+  }
 
   return (
     <div
@@ -722,6 +837,30 @@ function TaskDetailsModal({
                   </div>
                 </div>
               </div>
+              {task.assignee && teamProfiles?.[task.assignee] && (
+                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-text-muted flex-wrap">
+                  {teamProfiles[task.assignee].email && (
+                    <a
+                      href={`mailto:${teamProfiles[task.assignee].email}`}
+                      className="hover:text-brand-accent transition-colors truncate max-w-[170px]"
+                      title={`Email: ${teamProfiles[task.assignee].email}`}
+                    >
+                      ✉️ {teamProfiles[task.assignee].email}
+                    </a>
+                  )}
+                  {teamProfiles[task.assignee].github && (
+                    <a
+                      href={`https://github.com/${teamProfiles[task.assignee].github}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-text-primary transition-colors font-mono"
+                      title={`GitHub: @${teamProfiles[task.assignee].github}`}
+                    >
+                      @{teamProfiles[task.assignee].github}
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Due Date */}
@@ -913,7 +1052,7 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task, teamAvatars, t
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
-    };
+    }
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
     }
@@ -938,13 +1077,13 @@ function TaskFormModal({ isOpen, onClose, onSave, onDelete, task, teamAvatars, t
       context: formData.context.trim(),
       contextTool: formData.contextTool || null,
     });
-  };
+  }
 
   const handleDelete = () => {
     if (window.confirm('Delete Task? This cannot be undone.')) {
       onDelete(task.id);
     }
-  };
+  }
 
   return (
     <div
@@ -1194,11 +1333,11 @@ function TaskCard({ task, onTaskClick, onHandoff, onCopyPrompt, teamAvatars, onO
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
     setIsDragging(true);
-  };
+  }
 
   const handleDragEnd = () => {
     setIsDragging(false);
-  };
+  }
 
   return (
     <article
@@ -1340,6 +1479,7 @@ function KanbanColumn({
   teamAvatars,
   onOpenTeamModal,
   team = TEAM,
+  teamProfiles = {},
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -1348,7 +1488,7 @@ function KanbanColumn({
     'in-progress': 'bg-due-warning',
     'review': 'bg-brand-primary',
     'done': 'bg-type-feature',
-  };
+  }
 
   const accentDot = stageAccents[stage.id] || 'bg-slate-400';
 
@@ -1356,14 +1496,14 @@ function KanbanColumn({
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (!isDragOver) setIsDragOver(true);
-  };
+  }
 
   const handleDragLeave = (e) => {
     // Only turn off highlight if drag leaves the column container entirely
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setIsDragOver(false);
     }
-  };
+  }
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -1372,7 +1512,7 @@ function KanbanColumn({
     if (taskId && onMoveTask) {
       onMoveTask(taskId, stage.id);
     }
-  };
+  }
 
   return (
     <section
@@ -1440,7 +1580,7 @@ function AnchorCard({ anchor, onUpdateUrl }) {
     if (!url) return '#';
     const trimmed = url.trim();
     return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  };
+  }
 
   const getAnchorIcon = (id) => {
     switch (id) {
@@ -1480,7 +1620,7 @@ function AnchorCard({ anchor, onUpdateUrl }) {
           </svg>
         );
     }
-  };
+  }
 
   return (
     <div
@@ -1658,16 +1798,88 @@ export default function App() {
   // Secret Sauce: Custom team members list persisted to localStorage
   const [team, setTeam] = useLocalStorage(STORAGE_KEYS.team, TEAM);
 
+  // PRD §1.5: Team Member Profiles persisted to localStorage
+  const [teamProfiles, setTeamProfiles] = useLocalStorage(
+    STORAGE_KEYS.teamProfiles,
+    seedTeamProfiles
+  );
+
   // Safe team list fallback
   const effectiveTeam = Array.isArray(team) && team.length > 0 ? team : TEAM;
 
-  // Handler: Add Teammate
-  const handleAddTeammate = (name) => {
+  // Helper: Get or construct a teammate profile
+  const getProfileForMember = (member) => {
+    if (teamProfiles && teamProfiles[member]) {
+      return teamProfiles[member];
+    }
+    if (seedTeamProfiles && seedTeamProfiles[member]) {
+      return seedTeamProfiles[member];
+    }
+    return {
+      name: member,
+      email: `${member.toLowerCase().replace(/\s+/g, '.')}@vibecoding.dev`,
+      github: member.toLowerCase().replace(/\s+/g, '-'),
+    };
+  };
+
+  const effectiveTeamProfiles = effectiveTeam.reduce((acc, m) => {
+    acc[m] = getProfileForMember(m);
+    return acc;
+  }, { ...(teamProfiles || seedTeamProfiles) });
+
+  // Handler: Add Teammate with profile info (Name, Email, GitHub)
+  const handleAddTeammate = (name, email = '', github = '') => {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+
     setTeam((prev) => {
       const current = Array.isArray(prev) && prev.length > 0 ? prev : TEAM;
-      return [...current, name];
+      return [...current, cleanName];
     });
-    triggerToast(`Teammate "${name}" added to the team!`);
+
+    const cleanEmail =
+      email.trim() || `${cleanName.toLowerCase().replace(/\s+/g, '.')}@vibecoding.dev`;
+    const cleanGithub =
+      github.trim().replace(/^@/, '') || cleanName.toLowerCase().replace(/\s+/g, '-');
+
+    setTeamProfiles((prev) => ({
+      ...(prev || seedTeamProfiles),
+      [cleanName]: {
+        name: cleanName,
+        email: cleanEmail,
+        github: cleanGithub,
+      },
+    }));
+
+    triggerToast(`Teammate "${cleanName}" added to the team!`);
+  };
+
+  // Handler: Update Teammate Profile (Name, Email, GitHub)
+  const handleUpdateTeammateProfile = (oldName, updatedProfile) => {
+    const newName = updatedProfile.name.trim();
+    const newEmail = updatedProfile.email.trim();
+    const newGithub = updatedProfile.github.trim().replace(/^@/, '');
+
+    // 1. If name changed, rename across team, avatars, tasks
+    if (newName && newName !== oldName) {
+      handleRenameTeammate(oldName, newName);
+    }
+
+    const resolvedKey = newName || oldName;
+    setTeamProfiles((prev) => {
+      const next = { ...(prev || seedTeamProfiles) };
+      if (newName && newName !== oldName) {
+        delete next[oldName];
+      }
+      next[resolvedKey] = {
+        name: resolvedKey,
+        email: newEmail,
+        github: newGithub,
+      };
+      return next;
+    });
+
+    triggerToast(`Updated profile for ${resolvedKey}`);
   };
 
   // Handler: Rename Teammate
@@ -1688,12 +1900,24 @@ export default function App() {
       return next;
     });
 
-    // 3. Update any tasks assigned to oldName
+    // 3. Migrate profile if present
+    setTeamProfiles((prev) => {
+      const next = { ...(prev || seedTeamProfiles) };
+      const existing = next[oldName] || getProfileForMember(oldName);
+      delete next[oldName];
+      next[newName] = {
+        ...existing,
+        name: newName,
+      };
+      return next;
+    });
+
+    // 4. Update any tasks assigned to oldName
     setTasks((prev) =>
       prev.map((t) => (t.assignee === oldName ? { ...t, assignee: newName } : t))
     );
 
-    // 4. Update viewingTask if open
+    // 5. Update viewingTask if open
     setViewingTask((prev) =>
       prev && prev.assignee === oldName ? { ...prev, assignee: newName } : prev
     );
@@ -1716,12 +1940,19 @@ export default function App() {
       return next;
     });
 
-    // 3. Unassign tasks currently assigned to this teammate
+    // 3. Remove profile
+    setTeamProfiles((prev) => {
+      const next = { ...(prev || seedTeamProfiles) };
+      delete next[name];
+      return next;
+    });
+
+    // 4. Unassign tasks currently assigned to this teammate
     setTasks((prev) =>
       prev.map((t) => (t.assignee === name ? { ...t, assignee: null } : t))
     );
 
-    // 4. Update viewingTask if open
+    // 5. Update viewingTask if open
     setViewingTask((prev) =>
       prev && prev.assignee === name ? { ...prev, assignee: null } : prev
     );
@@ -1741,7 +1972,7 @@ export default function App() {
 
   const triggerToast = (message) => {
     setToast({ id: Date.now(), message });
-  };
+  }
 
   // Auto-dismiss toast after 4 seconds
   useEffect(() => {
@@ -1752,13 +1983,37 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Prototype Authentication state (PRD §1.1)
+  const [auth, setAuth] = useLocalStorage(STORAGE_KEYS.auth, {
+    isLoggedIn: false,
+    user: 'Teammate A',
+  });
+
+  const handleLogin = (userData) => {
+    const resolvedName = userData?.username || 'Teammate A';
+    setAuth({
+      isLoggedIn: true,
+      user: resolvedName,
+      email: userData?.email || '',
+    });
+    triggerToast(`Welcome back, ${resolvedName}!`);
+  }
+
+  const handleLogout = () => {
+    setAuth((prev) => ({
+      ...(prev || {}),
+      isLoggedIn: false,
+    }));
+    triggerToast('Logged out of workspace');
+  }
+
   // Handler for updating an anchor URL
   const handleUpdateAnchor = (id, newUrl) => {
     setAnchors((prev) => {
       const list = Array.isArray(prev) && prev.length > 0 ? prev : seedAnchors;
       return list.map((a) => (a.id === id ? { ...a, url: newUrl } : a));
     });
-  };
+  }
 
   // Safe fallback ensuring all 4 seed deliverables are present
   const effectiveAnchors = seedAnchors.map((seed) => {
@@ -1777,32 +2032,32 @@ export default function App() {
       }
       return next;
     });
-  };
+  }
 
   const handleOpenCreateModal = () => {
     setViewingTask(null);
     setEditingTask(null);
     setIsFormOpen(true);
-  };
+  }
 
   const handleOpenViewModal = (task) => {
     setViewingTask(task);
-  };
+  }
 
   const handleStartEditFromView = (task) => {
     setViewingTask(null);
     setEditingTask(task);
     setIsFormOpen(true);
-  };
+  }
 
   const handleCloseFormModal = () => {
     setIsFormOpen(false);
     setEditingTask(null);
-  };
+  }
 
   const handleCloseViewModal = () => {
     setViewingTask(null);
-  };
+  }
 
   /**
    * Handle task hand-off to a new assignee.
@@ -1828,7 +2083,7 @@ export default function App() {
     } else {
       triggerToast('Task unassigned.');
     }
-  };
+  }
 
   const handleSaveTask = (taskData) => {
     if (editingTask) {
@@ -1851,7 +2106,7 @@ export default function App() {
             ...t,
             ...taskData,
             contextUpdatedAt: contextChanged ? new Date().toISOString() : t.contextUpdatedAt,
-          };
+          }
         })
       );
     } else {
@@ -1861,20 +2116,20 @@ export default function App() {
         ...taskData,
         createdDate: new Date().toISOString().slice(0, 10),
         contextUpdatedAt: taskData.context ? new Date().toISOString() : null,
-      };
+      }
       setTasks((prev) => [...prev, newTask]);
       if (taskData.assignee) {
         triggerToast(`${taskData.assignee} has received the task! Their problem now...`);
       }
     }
     handleCloseFormModal();
-  };
+  }
 
   const handleDeleteTask = (taskId) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     handleCloseFormModal();
     handleCloseViewModal();
-  };
+  }
 
   /**
    * Secret Sauce: Move a task to a different Kanban stage via Drag & Drop.
@@ -1884,7 +2139,7 @@ export default function App() {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId && t.status !== newStatus ? { ...t, status: newStatus } : t))
     );
-  };
+  }
 
   /**
    * Milestone 10 copy-prompt: serialise task to Markdown and write to clipboard.
@@ -1904,7 +2159,17 @@ export default function App() {
       document.body.removeChild(el);
     }
     triggerToast('Prompt Copied');
-  };
+  }
+
+  // If not logged in, show the prototype Login Page
+  if (!auth?.isLoggedIn) {
+    return (
+      <>
+        <LoginPage onLogin={handleLogin} initialUsername={auth?.user || ''} />
+        <Toast toast={toast} onClose={() => setToast(null)} />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-page text-text-primary font-body p-4 sm:p-6 lg:p-8">
@@ -1925,6 +2190,26 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* User Profile Badge & Logout (Prototype Auth) */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-card border border-surface-border text-xs text-text-muted shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-type-feature animate-pulse" title="Signed In" />
+            <span className="text-text-primary font-medium truncate max-w-[120px]" title={auth?.user || 'User'}>
+              {auth?.user || 'User'}
+            </span>
+            <span className="text-surface-border">|</span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1 text-text-muted hover:text-due-overdue transition-colors font-medium active:scale-95"
+              title="Log out back to login screen"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>Log Out</span>
+            </button>
+          </div>
+
           {/* Teammate Profile Pictures & Management (Secret Sauce) */}
           <button
             type="button"
@@ -2000,6 +2285,7 @@ export default function App() {
         teamAvatars={teamAvatars}
         onOpenTeamModal={() => setIsTeamModalOpen(true)}
         team={effectiveTeam}
+        teamProfiles={effectiveTeamProfiles}
       />
 
       {/* Add / Edit Task Form Modal */}
@@ -2019,8 +2305,10 @@ export default function App() {
         onClose={() => setIsTeamModalOpen(false)}
         team={effectiveTeam}
         teamAvatars={teamAvatars}
+        teamProfiles={effectiveTeamProfiles}
         onUpdateAvatar={handleUpdateAvatar}
         onAddTeammate={handleAddTeammate}
+        onUpdateTeammateProfile={handleUpdateTeammateProfile}
         onRenameTeammate={handleRenameTeammate}
         onRemoveTeammate={handleRemoveTeammate}
         tasks={tasks}

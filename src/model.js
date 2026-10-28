@@ -22,6 +22,7 @@
  *   M9  context     — AI_TOOLS    → AI tool selector
  *   M10 copy-prompt — serialise Task → Markdown (uses context/contextTool)
  *   M11 anchors     — seedAnchors → Anchor Board
+ *   M1.5 profiles   — seedTeamProfiles → Team & User Profiles
  */
 
 /* ———————————————————————————————————————————————————————
@@ -33,6 +34,8 @@ export const STORAGE_KEYS = {
   anchors: 'vibetracker.anchors',
   teamAvatars: 'vibetracker.team_avatars',
   team: 'vibetracker.team',
+  teamProfiles: 'vibetracker.team_profiles',
+  auth: 'vibetracker.auth',
 };
 
 /* ———————————————————————————————————————————————————————
@@ -100,6 +103,28 @@ export const TEAM = [
   'Teammate B',
   'Teammate C',
 ];
+
+/**
+ * Pre-populated mock profiles for existing team members (PRD §1.5).
+ * Stores Name, Email Address, and GitHub Username.
+ */
+export const seedTeamProfiles = {
+  'Teammate A': {
+    name: 'Teammate A',
+    email: 'alex.chen@vibecoding.dev',
+    github: 'alexchen-dev',
+  },
+  'Teammate B': {
+    name: 'Teammate B',
+    email: 'sarah.connor@vibecoding.dev',
+    github: 'sarahc-vibe',
+  },
+  'Teammate C': {
+    name: 'Teammate C',
+    email: 'marcus.vance@vibecoding.dev',
+    github: 'marcusv-code',
+  },
+};
 
 /* ———————————————————————————————————————————————————————
  * AI tool options (M9 context)
